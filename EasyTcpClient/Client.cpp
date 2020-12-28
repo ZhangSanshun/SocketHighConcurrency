@@ -95,7 +95,7 @@ int main()
 
 	WSACleanup();
 
-	printf("Client Exit!!!!\n");
+	printf("Client Exit!!!\n");
 
 	getchar();
 
