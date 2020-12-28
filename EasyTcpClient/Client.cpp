@@ -76,7 +76,7 @@ int main()
 			*/
 			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
 		}
-
+		
 		/**
 		* 6: 接收服务器信息 recv
 		*/
@@ -95,7 +95,7 @@ int main()
 
 	WSACleanup();
 
-	printf("Client Exit!!!\n");
+	printf("Client Exit!!!!\n");
 
 	getchar();
 
