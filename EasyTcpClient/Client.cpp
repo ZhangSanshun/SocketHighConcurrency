@@ -97,7 +97,7 @@ int main()
 
 	printf("Client Exit!!!\n");
 
-	getchar();
+	getchar();  
 
 	return 0;
 }
