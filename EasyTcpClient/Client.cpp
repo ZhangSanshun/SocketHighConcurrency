@@ -76,7 +76,7 @@ int main()
 			*/
 			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
 		}
-		
+
 		/**
 		* 6: 接收服务器信息 recv
 		*/
