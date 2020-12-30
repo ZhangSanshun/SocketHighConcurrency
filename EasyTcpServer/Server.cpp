@@ -16,6 +16,12 @@
 #include <WinSock2.h>
 #include <iostream>
 
+struct DataPacket
+{
+	int age;
+	char name[32];
+};
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -87,22 +93,15 @@ int main()
 		/**
 		* 6: 处理请求
 		*/
-		if (0 == strcmp(_recvBuf, "getName"))
+		if (0 == strcmp(_recvBuf, "getInfo"))
 		{
 			/**
 			* 7: send 向客户端发送一条数据
 			*/
-			char msgBuf[] = "Xiao qiang.";
-			send(_cSocket, msgBuf, strlen(msgBuf) + 1, 0);
+			DataPacket dp = { 80, "张章" };
+			send(_cSocket, (const char*)&dp, sizeof(DataPacket) + 1, 0);
 		}
-		else if (0 == strcmp(_recvBuf, "getAge"))
-		{
-			/**
-			* 7: send 向客户端发送一条数据
-			*/
-			char msgBuf[] = "80.";
-			send(_cSocket, msgBuf, strlen(msgBuf) + 1, 0);
-		}
+		
 		else
 		{
 			/**

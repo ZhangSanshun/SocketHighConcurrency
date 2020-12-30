@@ -17,6 +17,12 @@
 #include <WinSock2.h>
 #include <iostream>
 
+struct DataPacket
+{
+	int age;
+	char name[32];
+};
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -84,7 +90,8 @@ int main()
 		int nlen = recv(_sock, recvBuf, 256, 0);
 		if (nlen > 0)
 		{
-			printf("recv data : %s \n", recvBuf);
+			DataPacket* dp = (DataPacket*)recvBuf;
+			printf("recv data : age = %d, name = %s \n", dp->age, dp->name);
 		}
 	}
 
@@ -97,7 +104,7 @@ int main()
 
 	printf("Client Exit!!!\n");
 
-	getchar();  
+	getchar();
 
 	return 0;
 }
