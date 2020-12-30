@@ -20,7 +20,9 @@
 enum CMD
 {
 	CMD_LOGIN,
+	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
+	CMD_LOGOUT_RESULT,
 	CMD_ERROR
 };
 
@@ -32,27 +34,55 @@ struct DataHeader
 };
 
 //登录数据包
-struct LoginData
+struct LoginData : public DataHeader
 {
+	LoginData()
+	{
+		cmd = CMD_LOGIN;
+		dataLenth = sizeof(LoginData);
+	}
+
 	char userName[32];
 	char passWord[32];
 };
 
 //登录结果数据包
-struct LoginResultData
+struct LoginResultData : public DataHeader
 {
+	LoginResultData()
+	{
+		cmd = CMD_LOGIN_RESULT;
+		dataLenth = sizeof(LoginResultData);
+
+		result = 0;
+	}
+
 	int result;
 };
 
 //登出数据包
-struct LogoutData
+struct LogoutData : public DataHeader
 {
+	LogoutData()
+	{
+		cmd = CMD_LOGOUT;
+		dataLenth = sizeof(LogoutData);
+	}
+
 	char userName[32];
 };
 
 //登出结果数据包
-struct LogoutResultData
+struct LogoutResultData : public DataHeader
 {
+	LogoutResultData()
+	{
+		cmd = CMD_LOGOUT_RESULT;
+		dataLenth = sizeof(LogoutResultData);
+
+		result = 0;
+	}
+
 	int result;
 };
 
@@ -113,19 +143,17 @@ int main()
 			/**
 			* 5: 向服务器发送请求命令
 			*/
-			LoginData loginData = { "zss", "123456" };
-			DataHeader dataHeader = { CMD_LOGIN, sizeof(LoginData) };
-			send(_sock, (const char*)&dataHeader, sizeof(DataHeader), 0);
+			LoginData loginData;
+			strcpy(loginData.userName, "zss");
+			strcpy(loginData.passWord, "123456");
+
 			send(_sock, (const char*)&loginData, sizeof(LoginData), 0);
 
 			/**
 			* 6: 接收服务器信息 recv
 			*/
-
-			DataHeader dataHeaderRet = {};
 			LoginResultData loginResultData = {};
 
-			recv(_sock, (char*)&dataHeaderRet, sizeof(DataHeader), 0);
 			recv(_sock, (char*)&loginResultData, sizeof(LoginResultData), 0);
 			
 			printf("recv loginResult data : %d\n", loginResultData.result);
@@ -136,19 +164,16 @@ int main()
 			/**
 			* 5: 向服务器发送请求命令
 			*/
-			LogoutData logoutData = { "zss"};
-			DataHeader dataHeader = { CMD_LOGOUT, sizeof(LogoutData) };
-
-			send(_sock, (const char*)&dataHeader, sizeof(DataHeader), 0);
+			LogoutData logoutData;
+			strcpy(logoutData.userName, "zss");
+			
 			send(_sock, (const char*)&logoutData, sizeof(LogoutData), 0);
 
 			/**
 			* 6: 接收服务器信息 recv
 			*/
-			DataHeader dataHeaderRet = {};
 			LogoutResultData logoutResultData = {};
 
-			recv(_sock, (char*)&dataHeaderRet, sizeof(DataHeader), 0);
 			recv(_sock, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
 
 			printf("recv logoutResult data : %d\n", logoutResultData.result);

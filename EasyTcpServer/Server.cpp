@@ -19,7 +19,9 @@
 enum CMD
 {
 	CMD_LOGIN,
+	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
+	CMD_LOGOUT_RESULT,
 	CMD_ERROR
 };
 
@@ -31,27 +33,55 @@ struct DataHeader
 };
 
 //登录数据包
-struct LoginData
+struct LoginData : public DataHeader
 {
+	LoginData()
+	{
+		cmd = CMD_LOGIN;
+		dataLenth = sizeof(LoginData);
+	}
+
 	char userName[32];
 	char passWord[32];
 };
 
 //登录结果数据包
-struct LoginResultData
+struct LoginResultData : public DataHeader
 {
+	LoginResultData()
+	{
+		cmd = CMD_LOGIN_RESULT;
+		dataLenth = sizeof(LoginResultData);
+
+		result = 0;
+	}
+
 	int result;
 };
 
 //登出数据包
-struct LogoutData
+struct LogoutData : public DataHeader
 {
+	LogoutData()
+	{
+		cmd = CMD_LOGOUT;
+		dataLenth = sizeof(LogoutData);
+	}
+
 	char userName[32];
 };
 
 //登出结果数据包
-struct LogoutResultData
+struct LogoutResultData : public DataHeader
 {
+	LogoutResultData()
+	{
+		cmd = CMD_LOGOUT_RESULT;
+		dataLenth = sizeof(LogoutResultData);
+
+		result = 0;
+	}
+
 	int result;
 };
 
@@ -107,14 +137,13 @@ int main()
 		printf("ERROR: Accept a Invalid Socket...\n");
 	}
 
-	printf("New Client Socket Join：socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
+	printf("New Client Socket Join: socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
 
 	while (true)
 	{
 		/**
 		* 5: recv 接收客户端数据
 		*/
-
 		DataHeader header = {};
 		int nLen = recv(_cSocket, (char*)&header, sizeof(DataHeader), 0);
 		if (nLen <= 0)
@@ -122,7 +151,6 @@ int main()
 			printf("Client Close, Exit!!!\n");
 			break;
 		}
-		printf("recv client data : %d , data length = %d \n", header.cmd, header.dataLenth);
 
 		/**
 		* 6: 处理请求
@@ -132,30 +160,34 @@ int main()
 		case CMD_LOGIN:
 			{
 				LoginData loginData = {};
-				recv(_cSocket, (char*)&loginData, sizeof(LoginData), 0);
+
+				//已经读取过消息头，需要进行偏移处理
+				recv(_cSocket, (char*)&loginData + sizeof(DataHeader), sizeof(LoginData) - sizeof(DataHeader), 0);
 			
+				printf("recv client data : CMD_LOGIN , data length = %d, userName = %s, passWord = %s \n", loginData.dataLenth, loginData.userName, loginData.passWord);
+
 				//忽略判断过程
 
 				/**
 				* 7: send 向客户端发送一条数据
 				*/
-				LoginResultData loginResultData = {1};
-				send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+				LoginResultData loginResultData;
 				send(_cSocket, (char*)&loginResultData, sizeof(LoginResultData), 0);
 			}	
 			break;
 		case CMD_LOGOUT:
 			{
 				LogoutData logoutData = {};
-				recv(_cSocket, (char*)&logoutData, sizeof(LogoutData), 0);
+				recv(_cSocket, (char*)&logoutData + sizeof(DataHeader), sizeof(LogoutData) - sizeof(DataHeader), 0);
+
+				printf("recv client data : CMD_LOGOUT , data length = %d, userName = %s \n", logoutData.dataLenth, logoutData.userName);
 
 				//忽略判断过程
 
 				/**
 				* 7: send 向客户端发送一条数据
 				*/
-				LogoutResultData logoutResultData = {1};
-				send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+				LogoutResultData logoutResultData;
 				send(_cSocket, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
 			}
 			break;
