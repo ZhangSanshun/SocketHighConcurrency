@@ -16,10 +16,43 @@
 #include <WinSock2.h>
 #include <iostream>
 
-struct DataPacket
+enum CMD
 {
-	int age;
-	char name[32];
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+};
+
+//消息头
+struct DataHeader
+{
+	short cmd;
+	short dataLenth;
+};
+
+//登录数据包
+struct LoginData
+{
+	char userName[32];
+	char passWord[32];
+};
+
+//登录结果数据包
+struct LoginResultData
+{
+	int result;
+};
+
+//登出数据包
+struct LogoutData
+{
+	char userName[32];
+};
+
+//登出结果数据包
+struct LogoutResultData
+{
+	int result;
 };
 
 int main()
@@ -76,39 +109,61 @@ int main()
 
 	printf("New Client Socket Join：socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
 
-	char _recvBuf[128] = {};
-
 	while (true)
 	{
 		/**
 		* 5: recv 接收客户端数据
 		*/
-		int nLen = recv(_cSocket, _recvBuf, 128, 0);
+
+		DataHeader header = {};
+		int nLen = recv(_cSocket, (char*)&header, sizeof(DataHeader), 0);
 		if (nLen <= 0)
 		{
 			printf("Client Close, Exit!!!\n");
 			break;
 		}
-		printf("recv client data : %s \n", _recvBuf);
+		printf("recv client data : %d , data length = %d \n", header.cmd, header.dataLenth);
+
 		/**
 		* 6: 处理请求
 		*/
-		if (0 == strcmp(_recvBuf, "getInfo"))
+		switch (header.cmd)
 		{
-			/**
-			* 7: send 向客户端发送一条数据
-			*/
-			DataPacket dp = { 80, "张章" };
-			send(_cSocket, (const char*)&dp, sizeof(DataPacket) + 1, 0);
-		}
-		
-		else
-		{
-			/**
-			* 7: send 向客户端发送一条数据
-			*/
-			char msgBuf[] = "???.";
-			send(_cSocket, msgBuf, strlen(msgBuf) + 1, 0);
+		case CMD_LOGIN:
+			{
+				LoginData loginData = {};
+				recv(_cSocket, (char*)&loginData, sizeof(LoginData), 0);
+			
+				//忽略判断过程
+
+				/**
+				* 7: send 向客户端发送一条数据
+				*/
+				LoginResultData loginResultData = {1};
+				send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+				send(_cSocket, (char*)&loginResultData, sizeof(LoginResultData), 0);
+			}	
+			break;
+		case CMD_LOGOUT:
+			{
+				LogoutData logoutData = {};
+				recv(_cSocket, (char*)&logoutData, sizeof(LogoutData), 0);
+
+				//忽略判断过程
+
+				/**
+				* 7: send 向客户端发送一条数据
+				*/
+				LogoutResultData logoutResultData = {1};
+				send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+				send(_cSocket, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
+			}
+			break;
+		default:
+			header.cmd = CMD_ERROR;
+			header.dataLenth = 0;
+			send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+			break;
 		}
 	}
 	

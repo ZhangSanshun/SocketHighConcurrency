@@ -17,10 +17,43 @@
 #include <WinSock2.h>
 #include <iostream>
 
-struct DataPacket
+enum CMD
 {
-	int age;
-	char name[32];
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+};
+
+//消息头
+struct DataHeader
+{
+	short cmd;
+	short dataLenth;
+};
+
+//登录数据包
+struct LoginData
+{
+	char userName[32];
+	char passWord[32];
+};
+
+//登录结果数据包
+struct LoginResultData
+{
+	int result;
+};
+
+//登出数据包
+struct LogoutData
+{
+	char userName[32];
+};
+
+//登出结果数据包
+struct LogoutResultData
+{
+	int result;
 };
 
 int main()
@@ -75,24 +108,56 @@ int main()
 			printf("Input Eixt!!!\n");
 			break;
 		}
-		else
+		else if (0 == strcmp(cmdBuf, "login"))
 		{
 			/**
 			* 5: 向服务器发送请求命令
 			*/
-			send(_sock, cmdBuf, strlen(cmdBuf) + 1, 0);
-		}
+			LoginData loginData = { "zss", "123456" };
+			DataHeader dataHeader = { CMD_LOGIN, sizeof(LoginData) };
+			send(_sock, (const char*)&dataHeader, sizeof(DataHeader), 0);
+			send(_sock, (const char*)&loginData, sizeof(LoginData), 0);
 
-		/**
-		* 6: 接收服务器信息 recv
-		*/
-		char recvBuf[256] = {};
-		int nlen = recv(_sock, recvBuf, 256, 0);
-		if (nlen > 0)
-		{
-			DataPacket* dp = (DataPacket*)recvBuf;
-			printf("recv data : age = %d, name = %s \n", dp->age, dp->name);
+			/**
+			* 6: 接收服务器信息 recv
+			*/
+
+			DataHeader dataHeaderRet = {};
+			LoginResultData loginResultData = {};
+
+			recv(_sock, (char*)&dataHeaderRet, sizeof(DataHeader), 0);
+			recv(_sock, (char*)&loginResultData, sizeof(LoginResultData), 0);
+			
+			printf("recv loginResult data : %d\n", loginResultData.result);
+			
 		}
+		else if (0 == strcmp(cmdBuf, "logout"))
+		{
+			/**
+			* 5: 向服务器发送请求命令
+			*/
+			LogoutData logoutData = { "zss"};
+			DataHeader dataHeader = { CMD_LOGOUT, sizeof(LogoutData) };
+
+			send(_sock, (const char*)&dataHeader, sizeof(DataHeader), 0);
+			send(_sock, (const char*)&logoutData, sizeof(LogoutData), 0);
+
+			/**
+			* 6: 接收服务器信息 recv
+			*/
+			DataHeader dataHeaderRet = {};
+			LogoutResultData logoutResultData = {};
+
+			recv(_sock, (char*)&dataHeaderRet, sizeof(DataHeader), 0);
+			recv(_sock, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
+
+			printf("recv logoutResult data : %d\n", logoutResultData.result);
+		}
+		else
+		{
+			printf("Input cmd Not Support!!! \n");
+		}
+		
 	}
 
 	/**
