@@ -144,8 +144,12 @@ int main()
 		/**
 		* 5: recv 接收客户端数据
 		*/
-		DataHeader header = {};
-		int nLen = recv(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+		//字符缓存区
+		char szRecv[1024] = {};
+		int nLen = recv(_cSocket, szRecv, sizeof(DataHeader), 0);
+
+		DataHeader* header = (DataHeader*)szRecv;
+
 		if (nLen <= 0)
 		{
 			printf("Client Close, Exit!!!\n");
@@ -155,16 +159,17 @@ int main()
 		/**
 		* 6: 处理请求
 		*/
-		switch (header.cmd)
+		switch (header->cmd)
 		{
 		case CMD_LOGIN:
 			{
-				LoginData loginData = {};
-
 				//已经读取过消息头，需要进行偏移处理
-				recv(_cSocket, (char*)&loginData + sizeof(DataHeader), sizeof(LoginData) - sizeof(DataHeader), 0);
+				recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
 			
-				printf("recv client data : CMD_LOGIN , data length = %d, userName = %s, passWord = %s \n", loginData.dataLenth, loginData.userName, loginData.passWord);
+				LoginData* loginData;
+				loginData = (LoginData*)szRecv;
+
+				printf("recv client data : CMD_LOGIN , data length = %d, userName = %s, passWord = %s \n", loginData->dataLenth, loginData->userName, loginData->passWord);
 
 				//忽略判断过程
 
@@ -177,10 +182,12 @@ int main()
 			break;
 		case CMD_LOGOUT:
 			{
-				LogoutData logoutData = {};
-				recv(_cSocket, (char*)&logoutData + sizeof(DataHeader), sizeof(LogoutData) - sizeof(DataHeader), 0);
+				recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
 
-				printf("recv client data : CMD_LOGOUT , data length = %d, userName = %s \n", logoutData.dataLenth, logoutData.userName);
+				LogoutData *logoutData;
+				logoutData = (LogoutData*)szRecv;
+
+				printf("recv client data : CMD_LOGOUT , data length = %d, userName = %s \n", logoutData->dataLenth, logoutData->userName);
 
 				//忽略判断过程
 
@@ -192,9 +199,10 @@ int main()
 			}
 			break;
 		default:
-			header.cmd = CMD_ERROR;
-			header.dataLenth = 0;
-			send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+			{
+				DataHeader header = { CMD_ERROR, 0 };
+				send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+			}
 			break;
 		}
 	}
