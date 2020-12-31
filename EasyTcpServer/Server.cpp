@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <WinSock2.h>
 #include <iostream>
+#include <vector>
 
 enum CMD
 {
@@ -85,6 +86,78 @@ struct LogoutResultData : public DataHeader
 	int result;
 };
 
+std::vector<SOCKET> g_clients;
+
+int processor(SOCKET _cSocket)
+{
+	/**
+	* 5: recv 接收客户端数据
+	*/
+	//字符缓存区
+	char szRecv[1024] = {};
+	int nLen = recv(_cSocket, szRecv, sizeof(DataHeader), 0);
+
+	DataHeader* header = (DataHeader*)szRecv;
+
+	if (nLen <= 0)
+	{
+		printf("Client Close, Exit!!!\n");
+		return -1;
+	}
+
+	/**
+	* 6: 处理请求
+	*/
+	switch (header->cmd)
+	{
+	case CMD_LOGIN:
+	{
+		//已经读取过消息头，需要进行偏移处理
+		recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
+
+		LoginData* loginData;
+		loginData = (LoginData*)szRecv;
+
+		printf("recv client data : CMD_LOGIN , data length = %d, userName = %s, passWord = %s \n", loginData->dataLenth, loginData->userName, loginData->passWord);
+
+		//忽略判断过程
+
+		/**
+		* 7: send 向客户端发送一条数据
+		*/
+		LoginResultData loginResultData;
+		send(_cSocket, (char*)&loginResultData, sizeof(LoginResultData), 0);
+	}
+	break;
+	case CMD_LOGOUT:
+	{
+		recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
+
+		LogoutData *logoutData;
+		logoutData = (LogoutData*)szRecv;
+
+		printf("recv client data : CMD_LOGOUT , data length = %d, userName = %s \n", logoutData->dataLenth, logoutData->userName);
+
+		//忽略判断过程
+
+		/**
+		* 7: send 向客户端发送一条数据
+		*/
+		LogoutResultData logoutResultData;
+		send(_cSocket, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
+	}
+	break;
+	default:
+	{
+		DataHeader header = { CMD_ERROR, 0 };
+		send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
+	}
+	break;
+	}
+
+	return 0;
+}
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -124,87 +197,74 @@ int main()
 		printf("Listen Port Success...\n");
 	}
 
-	/**
-	* 4: accept 等待接受客户端连接
-	*/
-	sockaddr_in clientAddr = {};
-	int clientAddrLen = sizeof(clientAddr);
-	SOCKET _cSocket = INVALID_SOCKET;
-
-	_cSocket = accept(_sock, (sockaddr*)&clientAddr, &clientAddrLen);
-	if (SOCKET_ERROR == _cSocket)
-	{
-		printf("ERROR: Accept a Invalid Socket...\n");
-	}
-
-	printf("New Client Socket Join: socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
-
 	while (true)
 	{
-		/**
-		* 5: recv 接收客户端数据
-		*/
-		//字符缓存区
-		char szRecv[1024] = {};
-		int nLen = recv(_cSocket, szRecv, sizeof(DataHeader), 0);
+		//select
+		fd_set fdRead;
+		fd_set fdWrite;
+		fd_set fdExp;
 
-		DataHeader* header = (DataHeader*)szRecv;
+		FD_ZERO(&fdRead);
+		FD_ZERO(&fdWrite);
+		FD_ZERO(&fdExp);
 
-		if (nLen <= 0)
+		FD_SET(_sock, &fdRead);
+		FD_SET(_sock, &fdWrite);
+		FD_SET(_sock, &fdExp);
+
+		for (int i = (int)g_clients.size() - 1; i >= 0; i--)
 		{
-			printf("Client Close, Exit!!!\n");
+			FD_SET(g_clients[i], &fdRead);
+		}
+
+		//nfds 是一个整数值，是指fd_set集合中所有描述符（socket）的范围，而不是数量
+		//即所有文件描述符最大值+1，在Windows中可以为0
+		timeval t = {0, 0}; //非阻塞
+		int  ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t); // timeval 为NULL时为阻塞
+		if (ret < 0)
+		{
+			printf("select Exist!!! \n");
 			break;
 		}
 
-		/**
-		* 6: 处理请求
-		*/
-		switch (header->cmd)
+		if (FD_ISSET(_sock, &fdRead))
 		{
-		case CMD_LOGIN:
+			FD_CLR(_sock, &fdRead);
+
+			/**
+			* 4: accept 等待接受客户端连接
+			*/
+			sockaddr_in clientAddr = {};
+			int clientAddrLen = sizeof(clientAddr);
+			SOCKET _cSocket = INVALID_SOCKET;
+
+			_cSocket = accept(_sock, (sockaddr*)&clientAddr, &clientAddrLen);
+			if (SOCKET_ERROR == _cSocket)
 			{
-				//已经读取过消息头，需要进行偏移处理
-				recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
-			
-				LoginData* loginData;
-				loginData = (LoginData*)szRecv;
-
-				printf("recv client data : CMD_LOGIN , data length = %d, userName = %s, passWord = %s \n", loginData->dataLenth, loginData->userName, loginData->passWord);
-
-				//忽略判断过程
-
-				/**
-				* 7: send 向客户端发送一条数据
-				*/
-				LoginResultData loginResultData;
-				send(_cSocket, (char*)&loginResultData, sizeof(LoginResultData), 0);
-			}	
-			break;
-		case CMD_LOGOUT:
-			{
-				recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
-
-				LogoutData *logoutData;
-				logoutData = (LogoutData*)szRecv;
-
-				printf("recv client data : CMD_LOGOUT , data length = %d, userName = %s \n", logoutData->dataLenth, logoutData->userName);
-
-				//忽略判断过程
-
-				/**
-				* 7: send 向客户端发送一条数据
-				*/
-				LogoutResultData logoutResultData;
-				send(_cSocket, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
+				printf("ERROR: Accept a Invalid Socket...\n");
 			}
-			break;
-		default:
-			{
-				DataHeader header = { CMD_ERROR, 0 };
-				send(_cSocket, (char*)&header, sizeof(DataHeader), 0);
-			}
-			break;
+
+			g_clients.push_back(_cSocket);
+
+			printf("New Client Socket Join: socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
 		}
+
+		for (size_t i = 0; i < fdRead.fd_count; i++)
+		{
+			if (-1 == processor(fdRead.fd_array[i]))
+			{
+				auto iter = find(g_clients.begin(), g_clients.end(), fdRead.fd_array[i]);
+				if (iter != g_clients.end())
+				{
+					g_clients.erase(iter);
+				}
+			}
+		}
+	}
+
+	for (size_t i = g_clients.size() - 1; i >= 0; i--)
+	{
+		closesocket(g_clients[i]);
 	}
 	
 	/**
