@@ -257,18 +257,20 @@ int main()
 			{
 				printf("ERROR: Accept a Invalid Socket...\n");
 			}
-
-			//群发给现有客户端
-			for (int i = (int)g_clients.size() - 1; i >= 0; i--)
+			else
 			{
-				NewUserJoinData newUserJoinData;
-				newUserJoinData.scok = _cSocket;
-				send(g_clients[i], (const char*)&newUserJoinData, sizeof(NewUserJoinData), 0);
+				//群发给现有客户端
+				for (int i = (int)g_clients.size() - 1; i >= 0; i--)
+				{
+					NewUserJoinData newUserJoinData;
+					newUserJoinData.scok = _cSocket;
+					send(g_clients[i], (const char*)&newUserJoinData, sizeof(NewUserJoinData), 0);
+				}
+
+				g_clients.push_back(_cSocket);
+
+				printf("New Client Socket Join: socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
 			}
-
-			g_clients.push_back(_cSocket);
-
-			printf("New Client Socket Join: socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
 		}
 
 		for (size_t i = 0; i < fdRead.fd_count; i++)

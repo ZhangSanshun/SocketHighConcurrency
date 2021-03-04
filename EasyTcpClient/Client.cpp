@@ -16,6 +16,7 @@
 #include <windows.h>
 #include <WinSock2.h>
 #include <iostream>
+#include <thread>
 
 enum CMD
 {
@@ -158,6 +159,43 @@ int processor(SOCKET _cSocket)
 	return 0;
 }
 
+bool g_bRun = true;
+
+void CmdTread(SOCKET _sock)
+{
+	while (true)
+	{
+		char cmdBuf[256] = {};
+		scanf("%s", cmdBuf);
+
+		if (0 == strcmp(cmdBuf, "exit"))
+		{
+			g_bRun = false;
+			printf("Exit thread!!!\n");
+			break;
+		}
+		else if (0 == strcmp(cmdBuf, "login"))
+		{
+			LoginData login;
+			strcpy(login.userName, "pql");
+			strcpy(login.passWord, "pql1115");
+
+			send(_sock, (const char*)&login, sizeof(LoginData), 0);
+		}
+		else if (0 == strcmp(cmdBuf, "logout"))
+		{
+			LogoutData logout;
+			strcpy(logout.userName, "pql");
+
+			send(_sock, (const char*)&logout, sizeof(LogoutData), 0);
+		}
+		else
+		{
+			printf("input data error!!!\n");
+		}
+	}
+
+}
 
 int main()
 {
@@ -194,8 +232,11 @@ int main()
 		printf("Connect Server Success...\n");
 	}
 
+	//Æô¶¯Ïß³Ì
+	std::thread t1(CmdTread, _sock);
+	t1.detach();
 	
-	while (true)
+	while (g_bRun)
 	{
 
 		fd_set fdReads;
@@ -224,6 +265,8 @@ int main()
 				break;
 			}
 		}
+
+
 
 		/*printf("waiting.....\n");
 
