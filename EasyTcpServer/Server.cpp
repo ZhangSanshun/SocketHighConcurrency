@@ -23,6 +23,7 @@ enum CMD
 	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
 	CMD_LOGOUT_RESULT,
+	CMD_NEW_USER_JOIN,
 	CMD_ERROR
 };
 
@@ -84,6 +85,19 @@ struct LogoutResultData : public DataHeader
 	}
 
 	int result;
+};
+
+//新用户加入数据包
+struct NewUserJoinData : public DataHeader
+{
+	NewUserJoinData()
+	{
+		cmd = CMD_NEW_USER_JOIN;
+		dataLenth = sizeof(NewUserJoinData);
+		scok = 0;
+	}
+
+	int scok;
 };
 
 std::vector<SOCKET> g_clients;
@@ -219,7 +233,7 @@ int main()
 
 		//nfds 是一个整数值，是指fd_set集合中所有描述符（socket）的范围，而不是数量
 		//即所有文件描述符最大值+1，在Windows中可以为0
-		timeval t = {0, 0}; //非阻塞
+		timeval t = {1, 0}; //非阻塞
 		int  ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t); // timeval 为NULL时为阻塞
 		if (ret < 0)
 		{
@@ -244,6 +258,14 @@ int main()
 				printf("ERROR: Accept a Invalid Socket...\n");
 			}
 
+			//群发给现有客户端
+			for (int i = (int)g_clients.size() - 1; i >= 0; i--)
+			{
+				NewUserJoinData newUserJoinData;
+				newUserJoinData.scok = _cSocket;
+				send(g_clients[i], (const char*)&newUserJoinData, sizeof(NewUserJoinData), 0);
+			}
+
 			g_clients.push_back(_cSocket);
 
 			printf("New Client Socket Join: socket = %d, IP = %s \n", _cSocket, inet_ntoa(clientAddr.sin_addr));
@@ -260,6 +282,9 @@ int main()
 				}
 			}
 		}
+
+		//printf("waiting.....\n");
+
 	}
 
 	for (size_t i = g_clients.size() - 1; i >= 0; i--)

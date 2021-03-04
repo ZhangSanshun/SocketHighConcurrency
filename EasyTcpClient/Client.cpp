@@ -23,6 +23,7 @@ enum CMD
 	CMD_LOGIN_RESULT,
 	CMD_LOGOUT,
 	CMD_LOGOUT_RESULT,
+	CMD_NEW_USER_JOIN,
 	CMD_ERROR
 };
 
@@ -86,6 +87,78 @@ struct LogoutResultData : public DataHeader
 	int result;
 };
 
+//新用户加入数据包
+struct NewUserJoinData : public DataHeader
+{
+	NewUserJoinData()
+	{
+		cmd = CMD_NEW_USER_JOIN;
+		dataLenth = sizeof(NewUserJoinData);
+		scok = 0;
+	}
+
+	int scok;
+};
+
+int processor(SOCKET _cSocket)
+{
+	/**
+	* 5: recv 接收客户端数据
+	*/
+	//字符缓存区
+	char szRecv[1024] = {};
+	int nLen = recv(_cSocket, szRecv, sizeof(DataHeader), 0);
+
+	DataHeader* header = (DataHeader*)szRecv;
+
+	if (nLen <= 0)
+	{
+		printf("communication break, finish!!!\n");
+		return -1;
+	}
+
+	/**
+	* 6: 处理请求
+	*/
+	switch (header->cmd)
+	{
+	case CMD_LOGIN_RESULT:
+	{
+		//已经读取过消息头，需要进行偏移处理
+		recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
+
+		LoginResultData* loginResultData;
+		loginResultData = (LoginResultData*)szRecv;
+
+		printf("recv service data : CMD_LOGIN_RESULT , data length = %d\n", loginResultData->dataLenth);
+	}
+	break;
+	case CMD_LOGOUT_RESULT:
+	{
+		recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
+
+		LogoutResultData *logoutResultData;
+		logoutResultData = (LogoutResultData*)szRecv;
+
+		printf("recv service data : CMD_LOGOUT_RESULT , data length = %d \n", logoutResultData->dataLenth);
+	}
+	break;
+	case CMD_NEW_USER_JOIN:
+	{
+		recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
+
+		NewUserJoinData *newUserJoinData;
+		newUserJoinData = (NewUserJoinData*)szRecv;
+
+		printf("recv service data : CMD_NEW_USER_JOIN ,socket = %d, data length = %d \n", newUserJoinData->scok, newUserJoinData->dataLenth);
+	}
+	break;
+	}
+
+	return 0;
+}
+
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);
@@ -124,64 +197,43 @@ int main()
 	
 	while (true)
 	{
-		/**
-		* 3: 输入请求命令
-		*/
-		char cmdBuf[128] = {};
-		scanf("%s", cmdBuf);
 
-		/**
-		* 4: 处理请求
-		*/
-		if (0 == strcmp(cmdBuf, "exit"))
+		fd_set fdReads;
+		FD_ZERO(&fdReads);
+		FD_SET(_sock, &fdReads);
+
+		timeval t;
+		t.tv_sec = 1;
+		t.tv_usec = 0;
+
+		int ret = select(_sock, &fdReads, nullptr, nullptr, &t);
+
+		if (ret < 0)
 		{
-			printf("Input Eixt!!!\n");
+			printf("select close1!!!\n");
 			break;
 		}
-		else if (0 == strcmp(cmdBuf, "login"))
+
+		if (FD_ISSET(_sock, &fdReads))
 		{
-			/**
-			* 5: 向服务器发送请求命令
-			*/
-			LoginData loginData;
-			strcpy(loginData.userName, "zss");
-			strcpy(loginData.passWord, "123456");
+			FD_CLR(_sock, &fdReads);
 
-			send(_sock, (const char*)&loginData, sizeof(LoginData), 0);
-
-			/**
-			* 6: 接收服务器信息 recv
-			*/
-			LoginResultData loginResultData = {};
-
-			recv(_sock, (char*)&loginResultData, sizeof(LoginResultData), 0);
-			
-			printf("recv loginResult data : %d\n", loginResultData.result);
-			
+			if (-1 == processor(_sock))
+			{
+				printf("select close2!!!\n");
+				break;
+			}
 		}
-		else if (0 == strcmp(cmdBuf, "logout"))
-		{
-			/**
-			* 5: 向服务器发送请求命令
-			*/
-			LogoutData logoutData;
-			strcpy(logoutData.userName, "zss");
-			
-			send(_sock, (const char*)&logoutData, sizeof(LogoutData), 0);
 
-			/**
-			* 6: 接收服务器信息 recv
-			*/
-			LogoutResultData logoutResultData = {};
+		/*printf("waiting.....\n");
 
-			recv(_sock, (char*)&logoutResultData, sizeof(LogoutResultData), 0);
+		LoginData login;
+		strcpy(login.userName, "pql");
+		strcpy(login.passWord, "pql1115");
 
-			printf("recv logoutResult data : %d\n", logoutResultData.result);
-		}
-		else
-		{
-			printf("Input cmd Not Support!!! \n");
-		}
+		send(_sock, (const char*)&login, sizeof(LoginData), 0);
+
+		Sleep(2000);*/
 		
 	}
 
