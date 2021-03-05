@@ -1,20 +1,31 @@
 /**
 * @file		Client.cpp
-* @brief		
+* @brief
 * @copyright	Copyright (c) 2020 ZhangSS
 * @par 修改记录:
 * <table>
 * <tr><th>修改日期    <th>修改人    <th>描述
 * <tr><td>2020-12-28  <td>ZhangSS  <td>创建第一版
-* <tr><td>2020-12-28  <td>  <td>
+* <tr><td>2021-03-05  <td>ZhangSS  <td>支持Linux系统
 * </table>
 */
 
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
+#ifdef _WIN32
 #include <windows.h>
 #include <WinSock2.h>
+#else
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <string.h>
+
+#define SOCKET int
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
+#endif
+
 #include <iostream>
 #include <thread>
 
@@ -199,10 +210,11 @@ void CmdTread(SOCKET _sock)
 
 int main()
 {
+#ifdef _WIN32
 	WORD ver = MAKEWORD(2, 2);
 	WSADATA data;
 	WSAStartup(ver, &data);
-
+#endif
 	/**
 	* 1: 建立一个socket套接字
 	*/
@@ -221,7 +233,11 @@ int main()
 	sockaddr_in _sockaddr = {};
 	_sockaddr.sin_family = AF_INET;
 	_sockaddr.sin_port = htons(4567);
+#ifdef _WIN32	
 	_sockaddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+#else
+	_sockaddr.sin_addr.s_addr = inet_addr("192.168.29.1");
+#endif
 	int ret = connect(_sock, (sockaddr*)&_sockaddr, sizeof(sockaddr_in));
 	if (SOCKET_ERROR == ret)
 	{
@@ -235,7 +251,7 @@ int main()
 	//启动线程
 	std::thread t1(CmdTread, _sock);
 	t1.detach();
-	
+
 	while (g_bRun)
 	{
 
@@ -247,7 +263,7 @@ int main()
 		t.tv_sec = 1;
 		t.tv_usec = 0;
 
-		int ret = select(_sock, &fdReads, nullptr, nullptr, &t);
+		int ret = select(_sock + 1, &fdReads, nullptr, nullptr, &t);
 
 		if (ret < 0)
 		{
@@ -266,27 +282,19 @@ int main()
 			}
 		}
 
+		/*printf("waiting.....\n");*/
 
-
-		/*printf("waiting.....\n");
-
-		LoginData login;
-		strcpy(login.userName, "pql");
-		strcpy(login.passWord, "pql1115");
-
-		send(_sock, (const char*)&login, sizeof(LoginData), 0);
-
-		Sleep(2000);*/
-		
 	}
 
 	/**
 	* 7: 关闭套接字closesocket
 	*/
+#ifdef _WIN32
 	closesocket(_sock);
-
 	WSACleanup();
-
+#else
+	close(_sock);
+#endif
 	printf("Client Exit!!!\n");
 
 	getchar();
