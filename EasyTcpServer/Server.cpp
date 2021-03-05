@@ -6,14 +6,27 @@
 * <table>
 * <tr><th>修改日期    <th>修改人    <th>描述
 * <tr><td>2020-12-25  <td>ZhangSS  <td>创建第一版
-* <tr><td>2020-12-25  <td>  <td>
+* <tr><td>2021-03-05  <td>ZhangSS  <td>支持Linux系统
 * </table>
 */
+
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <windows.h>
 #include <WinSock2.h>
+#else
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <string.h>
+
+#define SOCKET int
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
+#endif
+
 #include <iostream>
 #include <vector>
 
@@ -174,10 +187,11 @@ int processor(SOCKET _cSocket)
 
 int main()
 {
+#ifdef _WIN32
 	WORD ver = MAKEWORD(2, 2);
 	WSADATA data;
 	WSAStartup(ver, &data);
-
+#endif
 	/**
 	* 1: 建立一个socket套接字
 	*/
@@ -189,7 +203,11 @@ int main()
 	sockaddr_in _sockaddr = {};
 	_sockaddr.sin_family = AF_INET;
 	_sockaddr.sin_port = htons(4567);
+#ifdef _WIN32	
 	_sockaddr.sin_addr.S_un.S_addr = INADDR_ANY; //inet_addr("127.0.0.1")
+#else
+	_sockaddr.sin_addr.s_addr = INADDR_ANY; //inet_addr("127.0.0.1")
+#endif
 	if (SOCKET_ERROR == bind(_sock, (sockaddr*)&_sockaddr, sizeof(sockaddr_in)))
 	{
 		printf("ERROR: Bind Port Failed...\n");
@@ -226,15 +244,21 @@ int main()
 		FD_SET(_sock, &fdWrite);
 		FD_SET(_sock, &fdExp);
 
+		SOCKET maxSock = _sock;
+
 		for (int i = (int)g_clients.size() - 1; i >= 0; i--)
 		{
 			FD_SET(g_clients[i], &fdRead);
+			if (maxSock < g_clients[i])
+			{
+				maxSock = g_clients[i];
+			}
 		}
 
 		//nfds 是一个整数值，是指fd_set集合中所有描述符（socket）的范围，而不是数量
 		//即所有文件描述符最大值+1，在Windows中可以为0
-		timeval t = {1, 0}; //非阻塞
-		int  ret = select(_sock + 1, &fdRead, &fdWrite, &fdExp, &t); // timeval 为NULL时为阻塞
+		timeval t = { 1, 0 }; //非阻塞
+		int  ret = select(maxSock + 1, &fdRead, &fdWrite, &fdExp, &t); // timeval 为NULL时为阻塞
 		if (ret < 0)
 		{
 			printf("select Exist!!! \n");
@@ -251,8 +275,11 @@ int main()
 			sockaddr_in clientAddr = {};
 			int clientAddrLen = sizeof(clientAddr);
 			SOCKET _cSocket = INVALID_SOCKET;
-
+#ifdef _WIN32
 			_cSocket = accept(_sock, (sockaddr*)&clientAddr, &clientAddrLen);
+#else
+			_cSocket = accept(_sock, (sockaddr*)&clientAddr, (socklen_t *)&clientAddrLen);
+#endif
 			if (SOCKET_ERROR == _cSocket)
 			{
 				printf("ERROR: Accept a Invalid Socket...\n");
@@ -273,33 +300,59 @@ int main()
 			}
 		}
 
-		for (size_t i = 0; i < fdRead.fd_count; i++)
+		//Support Linux
+		for (int i = (int)g_clients.size() - 1; i >= 0; i--)
 		{
-			if (-1 == processor(fdRead.fd_array[i]))
+			if (FD_ISSET(g_clients[i], &fdRead))
 			{
-				auto iter = find(g_clients.begin(), g_clients.end(), fdRead.fd_array[i]);
-				if (iter != g_clients.end())
+				if (-1 == processor(g_clients[i]))
 				{
-					g_clients.erase(iter);
+					auto iter = g_clients.begin() + i;
+					if (iter != g_clients.end())
+					{
+						g_clients.erase(iter);
+					}
 				}
 			}
 		}
+
+		//Not support Linux 
+		//for (size_t i = 0; i < fdRead.fd_count; i++)
+		//{
+		//	if (-1 == processor(fdRead.fd_array[i]))
+		//	{
+		//		auto iter = find(g_clients.begin(), g_clients.end(), fdRead.fd_array[i]);
+		//		if (iter != g_clients.end())
+		//		{
+		//			g_clients.erase(iter);
+		//		}
+		//	}
+		//}
 
 		//printf("waiting.....\n");
 
 	}
 
-	for (size_t i = g_clients.size() - 1; i >= 0; i--)
-	{
-		closesocket(g_clients[i]);
-	}
-	
+#ifdef _WIN32
 	/**
 	* 8: 关闭套接字closesocket
 	*/
+	for (int i = (int)g_clients.size() - 1; i >= 0; i--)
+	{
+		closesocket(g_clients[i]);
+	}
+
 	closesocket(_sock);
 
 	WSACleanup();
+#else
+	for (int i = (int)g_clients.size() - 1; i >= 0; i--)
+	{
+		close(g_clients[i]);
+	}
+
+	close(_sock);
+#endif
 
 	printf("Server Exit!!!\n");
 
