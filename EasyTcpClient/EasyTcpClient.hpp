@@ -125,7 +125,7 @@ public:
 			FD_SET(_sock, &fdReads);
 
 			timeval t;
-			t.tv_sec = 1;
+			t.tv_sec = 0;
 			t.tv_usec = 0;
 
 			int ret = select(_sock + 1, &fdReads, nullptr, nullptr, &t);
@@ -133,6 +133,7 @@ public:
 			if (ret < 0)
 			{
 				printf("[socket=%d]select close1!!!\n", _sock);
+				Close();
 				return false;
 			}
 
@@ -143,6 +144,7 @@ public:
 				if (-1 == RecvData(_sock))
 				{
 					printf("[socket=%d]select close2!!!\n", _sock);
+					Close();
 					return false;
 				}
 			}
