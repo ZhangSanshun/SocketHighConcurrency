@@ -12,8 +12,9 @@
 
 #include "EasyTcpClient.hpp"
 
+bool g_bRun = true;
 
-void CmdTread(EasyTcpClient* client)
+void CmdTread()
 {
 	while (true)
 	{
@@ -22,50 +23,100 @@ void CmdTread(EasyTcpClient* client)
 
 		if (0 == strcmp(cmdBuf, "exit"))
 		{
-			client->Close();
+			g_bRun = false;
+			//client->Close();
 			printf("Exit thread!!!\n");
 			break;
 		}
-		else if (0 == strcmp(cmdBuf, "login"))
-		{
-			LoginData login;
-			strcpy(login.userName, "pql");
-			strcpy(login.passWord, "pql1115");
-			client->SendData(&login);
-		}
-		else if (0 == strcmp(cmdBuf, "logout"))
-		{
-			LogoutData logout;
-			strcpy(logout.userName, "pql");
-
-			client->SendData(&logout);
-		}
-		else
-		{
-			printf("input data error!!!\n");
-		}
+// 		else if (0 == strcmp(cmdBuf, "login"))
+// 		{
+// 			LoginData login;
+// 			strcpy(login.userName, "pql");
+// 			strcpy(login.passWord, "pql1115");
+// 			client->SendData(&login);
+// 		}
+// 		else if (0 == strcmp(cmdBuf, "logout"))
+// 		{
+// 			LogoutData logout;
+// 			strcpy(logout.userName, "pql");
+// 
+// 			client->SendData(&logout);
+// 		}
+// 		else
+// 		{
+// 			printf("input data error!!!\n");
+// 		}
 	}
 
 }
 
-int main()
+//客户端数量
+const int cCount = 1000;
+//线程数量
+const int tCount = 4;
+
+//客户端线程
+EasyTcpClient* client[cCount];
+
+void SendThread(int id)
 {
-	EasyTcpClient client;
 
-	//client.InitSocket();
-	client.Connect("127.0.0.1", 4567);
+	int begin = (id - 1) * (cCount / tCount);
+	int end = id * (cCount / tCount);
 
-	//启动线程
-	std::thread t1(CmdTread, &client);
-	t1.detach();
-
-	while (client.isRun())
+	for (int i = begin; i < end; i++)
 	{
-		client.OnRun();
+		if (!g_bRun)
+		{
+			return;
+		}
+		client[i] = new EasyTcpClient();
 	}
 
-	client.Close();
+	for (int i = begin; i < end; i++)
+	{
+		if (!g_bRun)
+		{
+			return;
+		}
+		client[i]->Connect("127.0.0.1", 4567);
+	}
 
+	LoginData login;
+	strcpy(login.userName, "pql");
+	strcpy(login.passWord, "pql1115");
+
+	while (g_bRun)
+	{
+		for (int i = begin; i < end; i++)
+		{
+			client[i]->SendData(&login);
+			//client[i]->OnRun();
+		}
+	}
+	for (int i = begin; i < end; i++)
+	{
+		client[i]->Close();
+	}
+}
+
+int main()
+{
+
+	//启动线程
+	std::thread t1(CmdTread);
+	t1.detach();
+
+	for (int i = 0; i < tCount; i++)
+	{
+		std::thread t1(SendThread, i+1);
+		t1.detach();
+	}
+
+	while (g_bRun)
+	{
+		Sleep(100);
+	}
 
 	getchar();
 

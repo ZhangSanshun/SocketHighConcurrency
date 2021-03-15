@@ -61,7 +61,7 @@ public:
 		}
 		else
 		{
-			printf("Build Socket Success...\n");
+			//printf("Build Socket Success...\n");
 		}
 	}
 
@@ -91,7 +91,7 @@ public:
 		}
 		else
 		{
-			printf("Connect Server Success...\n");
+			//printf("Connect Server Success...\n");
 		}
 
 		return ret;
@@ -161,17 +161,24 @@ public:
 		return INVALID_SOCKET != _sock;
 	}
 
-	//接收数据,处理粘包，拆分包
-	int RecvData(SOCKET _cSocket)
-	{
-		/**
-		* 5: recv 接收客户端数据
-		*/
-		//字符缓存区
-		char szRecv[1024] = {};
-		int nLen = recv(_cSocket, szRecv, sizeof(DataHeader), 0);
+	//缓冲区最小单元大小
+#ifndef RECV_BUFF_SIZE
+#define RECV_BUFF_SIZE 1024
+#endif // !RECV_BUFF_SIZE
 
-		DataHeader* header = (DataHeader*)szRecv;
+
+	//接收缓存区
+	char _szRecv[RECV_BUFF_SIZE] = {};
+
+	//消息缓冲区
+	char _szMsgBuf[RECV_BUFF_SIZE * 10] = {};
+	//消息缓冲区尾部位置
+	int _lastPos = 0;
+
+	//接收数据,处理粘包，拆分包
+	int RecvData(SOCKET cSocket)
+	{
+		int nLen = recv(cSocket, _szRecv, RECV_BUFF_SIZE, 0);
 
 		if (nLen <= 0)
 		{
@@ -179,11 +186,33 @@ public:
 			return -1;
 		}
 
-		//已经读取过消息头，需要进行偏移处理
-		recv(_cSocket, szRecv + sizeof(DataHeader), header->dataLenth - sizeof(DataHeader), 0);
-
-		OnNetMsg(header);
-
+		//将收取到的数据拷贝到消息缓冲区
+		memcpy(_szMsgBuf + _lastPos, _szRecv, nLen);
+		//消息缓冲区的数据尾部位置后移
+		_lastPos += nLen;
+		//判断已接收的缓冲区消息数据长度大于DataHeader长度
+		while (_lastPos > sizeof(DataHeader))
+		{
+			//这时就可以知道当前消息体的长度
+			DataHeader* header = (DataHeader*)_szMsgBuf;
+			//判断消息缓冲区的数据长度大于消息长度
+			if (_lastPos >= header->dataLenth)
+			{
+				//消息缓冲区剩余未处理数据的长度
+				int nSize = _lastPos - header->dataLenth;
+				//处理网络消息
+				OnNetMsg(header);
+				//将消息缓冲区剩余未处理数据前移
+				memcpy(_szMsgBuf, _szMsgBuf + header->dataLenth, nSize);
+				//消息缓冲区的数据尾部前移
+				_lastPos = nSize;
+			}
+			else
+			{
+				//消息缓冲区剩余数据不够一条完整消息
+				break;
+			}
+		}
 		return 0;
 	}
 
@@ -219,7 +248,17 @@ public:
 			printf("recv service data : CMD_NEW_USER_JOIN ,socket = %d, data length = %d \n", newUserJoinData->scok, newUserJoinData->dataLenth);
 		}
 		break;
+		case CMD_ERROR:
+		{
+			printf("recv service data : CMD_ERROR , data length = %d \n", header->dataLenth);
 		}
+		break;
+		default:
+		{
+			printf("recv unknow data , data length = %d \n", header->dataLenth);
+		}
+		}
+		
 	}
 
 	//发送数据

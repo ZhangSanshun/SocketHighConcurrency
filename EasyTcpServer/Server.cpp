@@ -22,6 +22,8 @@ int main()
 	server.Bind(nullptr, 4567);
 	server.Listen(5);
 
+	server.Start();
+
 	while (server.isRun())
 	{
 		server.OnRun();
